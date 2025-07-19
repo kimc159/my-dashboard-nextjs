@@ -1,101 +1,151 @@
-import Image from "next/image";
+'use client'
 
-export default function Home() {
+import { useState } from 'react'
+import { TopMenu } from '@/components/TopMenu'
+import Footer from '@/components/Footer'
+import ContentView from '@/components/ContentView'
+import { MENU_CONFIG, MainMenuKey } from '@/libs/menus'
+import { Box, Tabs, Tab } from '@mui/material'
+import { SidebarMenu } from '@/components/SidebarMenu'
+
+type TabInfo = {
+  mainMenu: MainMenuKey
+  subMenuKey: string
+  label: string
+  id: string // unique id, 예: `${mainMenu}_${subMenuKey}`
+}
+
+export default function HomePage() {
+  const [mainMenu, setMainMenu] = useState<MainMenuKey>('member')
+  const [subMenuKey, setSubMenuKey] = useState<string>(MENU_CONFIG['member'].subMenus[0].key)
+
+  // 열려있는 탭들 상태
+  const [tabs, setTabs] = useState<TabInfo[]>([
+    {
+      mainMenu: 'member',
+      subMenuKey: MENU_CONFIG['member'].subMenus[0].key,
+      label: MENU_CONFIG['member'].subMenus[0].label,
+      id: `member_${MENU_CONFIG['member'].subMenus[0].key}`,
+    },
+  ])
+
+  // 현재 선택된 탭 id
+  const [currentTabId, setCurrentTabId] = useState(tabs[0].id)
+
+  // 사이드바 메뉴 클릭 시 탭 추가 or 선택 처리
+  function handleMenuSelect(mainKey: MainMenuKey, subKey: string) { 
+    const id = `${mainKey}_${subKey}`
+    const existingTab = tabs.find((tab) => tab.id === id)
+    if (!existingTab) {
+      const label = MENU_CONFIG[mainKey].subMenus.find((item) => item.key === subKey)?.label || ''
+      const newTab = { mainMenu: mainKey, subMenuKey: subKey, label, id }
+      setTabs((prev) => [...prev, newTab])
+    }
+    setCurrentTabId(id)
+    setMainMenu(mainKey)
+    setSubMenuKey(subKey)
+  }
+
+  // 탭 클릭 변경
+  function handleTabChange(event: React.SyntheticEvent, newValue: string) {
+    setCurrentTabId(newValue)
+    const [mainKey, subKey] = newValue.split('_') as [MainMenuKey, string]
+    setMainMenu(mainKey)
+    setSubMenuKey(subKey)
+  }
+
+  // 탭 닫기 버튼 클릭
+  function handleTabClose(event: React.MouseEvent, tabId: string) {
+    event.stopPropagation() // 클릭 이벤트 버블링 방지
+    setTabs((prev) => {
+      const filtered = prev.filter((tab) => tab.id !== tabId)
+      if (filtered.length === 0) {
+        // 탭 다 닫히면 기본 탭 다시 열기
+        const defaultMain = 'member' as MainMenuKey
+        const defaultSub = MENU_CONFIG[defaultMain].subMenus[0].key
+        setCurrentTabId(`${defaultMain}_${defaultSub}`)
+        setMainMenu(defaultMain)
+        setSubMenuKey(defaultSub)
+        return [
+          {
+            mainMenu: defaultMain,
+            subMenuKey: defaultSub,
+            label: MENU_CONFIG[defaultMain].subMenus[0].label,
+            id: `${defaultMain}_${defaultSub}`,
+          },
+        ]
+      }
+      // 현재 선택 탭 닫을 경우, 앞 탭으로 이동
+      if (tabId === currentTabId) {
+        const closedIndex = prev.findIndex((tab) => tab.id === tabId)
+        const newCurrent =
+          filtered[closedIndex - 1]?.id || filtered[0]?.id || ''
+        setCurrentTabId(newCurrent)
+        const [mainKey, subKey] = newCurrent.split('_') as [MainMenuKey, string]
+        setMainMenu(mainKey)
+        setSubMenuKey(subKey)
+      }
+      return filtered
+    })
+  }
+
   return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="https://nextjs.org/icons/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-semibold">
-              app/page.tsx
-            </code>
-            .
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
-
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+    <div className="h-screen flex flex-col">
+      <TopMenu
+        current={mainMenu}
+        onSelect={(key) => {
+          const firstSub = MENU_CONFIG[key].subMenus[0].key
+          handleMenuSelect(key, firstSub)
+        }}
+      />
+      <div className="flex flex-1 overflow-hidden">
+        <SidebarMenu mainMenuKey={mainMenu} current={subMenuKey} onSelect={(subKey) => {
+          handleMenuSelect(mainMenu, subKey)
+        }} />
+        <Box className="flex-1 flex flex-col" sx={{ overflow: 'hidden' , pt: '64px' }}>
+          <Tabs
+            value={currentTabId}
+            onChange={handleTabChange}
+            variant="scrollable"
+            scrollButtons="auto"
+            sx={{ borderBottom: 1, borderColor: 'divider', bgcolor: 'background.paper' }}
           >
-            <Image
-              className="dark:invert"
-              src="https://nextjs.org/icons/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
+            {tabs.map((tab) => (
+                  <Tab
+              key={tab.id}
+              value={tab.id}
+              label={
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                  {tab.label}
+                  <span
+                    onClick={(e) => handleTabClose(e as any, tab.id)}
+                    style={{ cursor: 'pointer', color: '#aaa' }}
+                  >
+                    ×
+                  </span>
+                </span>
+              }
+              sx={{ position: 'relative', pr: 5 }} // 오른쪽 여백 확보
             />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:min-w-44"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
-        </div>
-      </main>
-      <footer className="row-start-3 flex gap-6 flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+            ))}
+          </Tabs>
+
+          <Box sx={{ flexGrow: 1, overflow: 'auto', p: 3, bgcolor: '#f9fafb' }}>
+            {/* 현재 탭에 맞는 콘텐츠 렌더 */}
+            {tabs.map(
+              (tab) =>
+                tab.id === currentTabId && (
+                  <ContentView
+                    key={tab.id}
+                    main={tab.mainMenu}
+                    sub={tab.subMenuKey}
+                  />
+                )
+            )}
+          </Box>
+        </Box>
+      </div>
+      <Footer />
     </div>
-  );
+  )
 }
